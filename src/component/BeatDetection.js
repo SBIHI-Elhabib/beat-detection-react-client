@@ -184,7 +184,7 @@ const BeatDetection = ({ onXmlGenerated }) => {
     setLoading(true);
     resetState();
     try {
-      const response = await axios.get('https://server-gnws026oo-sbihi-elhabibs-projects.vercel.app/stream', {
+      const response = await axios.get('https://youtub-server.onrender.com/stream', {
         params: { url: youtubeUrl },
         responseType: 'blob',
       });
