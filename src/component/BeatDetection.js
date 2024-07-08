@@ -215,9 +215,9 @@ const BeatDetection = ({ onXmlGenerated }) => {
     const trimmedBuffer = trimAudioBuffer(audioBufferRef.current, selectedDuration, startTime);
     audioBufferRef.current = trimmedBuffer;
 
-    const moderatoBeats = detectBeats(trimmedBuffer, selectedDuration, 0.4, 0.6);
-    const allegroBeats = detectBeats(trimmedBuffer, selectedDuration, 0.3, 0.4);
-    const adagioBeats = detectBeats(trimmedBuffer, selectedDuration, 0.4, 0.8);
+    const moderatoBeats = detectBeats(trimmedBuffer, selectedDuration, 0.5, 0.9);
+    const allegroBeats = detectBeats(trimmedBuffer, selectedDuration, 0.4, 0.8);
+    const adagioBeats = detectBeats(trimmedBuffer, selectedDuration, 0.5, 2);
 
     setTempoBeats({
       moderato: moderatoBeats,
