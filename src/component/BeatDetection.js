@@ -14,14 +14,14 @@ const BeatDetection = ({ onXmlGenerated }) => {
   const [showVideo, setShowVideo] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [tempoBeats, setTempoBeats] = useState({
-    moderato: [],
-    allegro: [],
-    adagio: []
+    normal: [],
+    fast: [],
+    slow: []
   });
   const [tempoXmls, setTempoXmls] = useState({
-    moderato: '',
-    allegro: '',
-    adagio: ''
+    normal: '',
+    fast: '',
+    slow: ''
   });
   const [selectedTempo, setSelectedTempo] = useState(null);
   const [showTrimmer, setShowTrimmer] = useState(false);
@@ -44,8 +44,8 @@ const BeatDetection = ({ onXmlGenerated }) => {
     setTrimmedAudioUrl(null);
     setShowVideo(false);
     setCurrentTime(0);
-    setTempoBeats({ moderato: [], allegro: [], adagio: [] });
-    setTempoXmls({ moderato: '', allegro: '', adagio: '' });
+    setTempoBeats({ normal: [], fast: [], slow: [] });
+    setTempoXmls({ normal: '', fast: '', slow: '' });
     setSelectedTempo(null);
     setShowTrimmer(false);
     audioBufferRef.current = null;
@@ -61,11 +61,12 @@ const BeatDetection = ({ onXmlGenerated }) => {
     }
   }, []);
 
-  const detectBeats = useCallback((audioBuffer, duration, threshold, minimumTimeBetweenBeats) => {
+  const detectBeats = useCallback((audioBuffer, duration, sensitivity, minTimeBetweenBeats) => {
     const rawData = audioBuffer.getChannelData(0);
     const sampleRate = audioBuffer.sampleRate;
     const bufferSize = 1024;
-    const minTimeSamples = minimumTimeBetweenBeats * sampleRate;
+    const minTimeSamples = minTimeBetweenBeats * sampleRate;
+    const maxTimeSamples = 3 * sampleRate; // 3 seconds maximum between cuts
 
     const maxSamples = duration * sampleRate;
     let lastBeatTime = -Infinity;
@@ -74,12 +75,17 @@ const BeatDetection = ({ onXmlGenerated }) => {
     for (let i = 0; i < rawData.length && i < maxSamples; i += bufferSize) {
       let sum = 0;
       for (let j = 0; i + j < rawData.length && j < bufferSize; j++) {
-        sum += rawData[i + j] ** 2;
+        sum += Math.abs(rawData[i + j]);
       }
 
-      const rms = Math.sqrt(sum / bufferSize);
+      const average = sum / bufferSize;
 
-      if (rms > threshold && i - lastBeatTime > minTimeSamples) {
+      if (average > sensitivity && i - lastBeatTime > minTimeSamples) {
+        const currentTime = i / sampleRate;
+        beats.push(currentTime);
+        lastBeatTime = i;
+      } else if (i - lastBeatTime > maxTimeSamples) {
+        // Force a cut if more than 3 seconds have passed
         const currentTime = i / sampleRate;
         beats.push(currentTime);
         lastBeatTime = i;
@@ -215,27 +221,27 @@ const BeatDetection = ({ onXmlGenerated }) => {
     const trimmedBuffer = trimAudioBuffer(audioBufferRef.current, selectedDuration, startTime);
     audioBufferRef.current = trimmedBuffer;
 
-    const moderatoBeats = detectBeats(trimmedBuffer, selectedDuration, 0.5, 0.9);
-    const allegroBeats = detectBeats(trimmedBuffer, selectedDuration, 0.4, 0.8);
-    const adagioBeats = detectBeats(trimmedBuffer, selectedDuration, 0.5, 2);
+    const normalBeats = detectBeats(trimmedBuffer, selectedDuration, 0.5, 1.5);
+    const fastBeats = detectBeats(trimmedBuffer, selectedDuration, 0.4, 1);
+    const slowBeats = detectBeats(trimmedBuffer, selectedDuration, 0.55, 2);
 
     setTempoBeats({
-      moderato: moderatoBeats,
-      allegro: allegroBeats,
-      adagio: adagioBeats
+      normal: normalBeats,
+      fast: fastBeats,
+      slow: slowBeats
     });
 
-    const moderatoXml = generateXml(moderatoBeats);
-    const allegroXml = generateXml(allegroBeats);
-    const adagioXml = generateXml(adagioBeats);
+    const normalXml = generateXml(normalBeats);
+    const fastXml = generateXml(fastBeats);
+    const slowXml = generateXml(slowBeats);
 
     setTempoXmls({
-      moderato: moderatoXml,
-      allegro: allegroXml,
-      adagio: adagioXml
+      normal: normalXml,
+      fast: fastXml,
+      slow: slowXml
     });
 
-    onXmlGenerated(moderatoXml, audioUrl);
+    onXmlGenerated(normalXml, audioUrl);
 
     const wavBuffer = audioBufferToWav(trimmedBuffer);
     const blob = new Blob([wavBuffer], { type: 'audio/wav' });
@@ -332,34 +338,34 @@ const BeatDetection = ({ onXmlGenerated }) => {
           showDuration={true}
         />
       )}
-      {tempoBeats.moderato.length > 0 && (
+      {tempoBeats.normal.length > 0 && (
         <>
-          <h3>Moderato Tempo</h3>
+          <h3>Normal Tempo</h3>
           <Timeline 
-            beats={tempoBeats.moderato} 
-            onSelectBeat={(time) => handleSelectBeat(time, 'moderato')} 
+            beats={tempoBeats.normal} 
+            onSelectBeat={(time) => handleSelectBeat(time, 'normal')} 
             currentTime={currentTime} 
             color="green"
-            tempoName="moderato"
-            isSelected={selectedTempo === 'moderato'}
+            tempoName="normal"
+            isSelected={selectedTempo === 'normal'}
           />
-          <h3>Allegro Tempo</h3>
+          <h3>Fast Tempo</h3>
           <Timeline 
-            beats={tempoBeats.allegro} 
-            onSelectBeat={(time) => handleSelectBeat(time, 'allegro')} 
+            beats={tempoBeats.fast} 
+            onSelectBeat={(time) => handleSelectBeat(time, 'fast')} 
             currentTime={currentTime} 
             color="red"
-            tempoName="allegro"
-            isSelected={selectedTempo === 'allegro'}
+            tempoName="fast"
+            isSelected={selectedTempo === 'fast'}
           />
-          <h3>Adagio Tempo</h3>
+          <h3>Slow Tempo</h3>
           <Timeline 
-            beats={tempoBeats.adagio} 
-            onSelectBeat={(time) => handleSelectBeat(time, 'adagio')} 
+            beats={tempoBeats.slow} 
+            onSelectBeat={(time) => handleSelectBeat(time, 'slow')} 
             currentTime={currentTime} 
             color="blue"
-            tempoName="adagio"
-            isSelected={selectedTempo === 'adagio'}
+            tempoName="slow"
+            isSelected={selectedTempo === 'slow'}
           />
         </>
       )}
